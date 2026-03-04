@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Plant Disease Detection</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2e7d32;
+        }
+
+        .upload-area {
+            border: 2px dashed #81c784;
+            padding: 50px;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.6);
+            transition: 0.3s ease;
+        }
+
+        .upload-area:hover {
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .upload-area.dragover {
+            border-color: #2e7d32;
+            background: #e8f5e9;
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 25px;
+            border-radius: 14px;
+            background: #ffffff;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+        }
+
+        .healthy {
+            border-left: 8px solid #28a745;
+        }
+
+        .diseased {
+            border-left: 8px solid #dc3545;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            color: white;
+            margin-left: 10px;
+        }
+
+        .badge.healthy {
+            background: #28a745;
+        }
+
+        .badge.diseased {
+            background: #dc3545;
+        }
+
+        .image-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .image-card {
+            text-align: center;
+        }
+
+        .image-card img {
+            max-width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .care-info {
+            background: #f1f8ff;
+            padding: 20px;
+            margin-top: 25px;
+            border-radius: 10px;
+            border-left: 6px solid #007bff;
+        }
+
+        .care-title {
+            font-weight: bold;
+            color: #0056b3;
+        }
+
+        .symptoms-list {
+            padding-left: 20px;
+        }
+
+        details {
+            margin-top: 20px;
+        }
+
+        pre {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+
+<h1>🌱 Smart Plant Disease Detection</h1>
+
+<div class="upload-area" onclick="document.getElementById('imageInput').click()">
+    <p>📁 Click or drag & drop plant leaf image here</p>
+    <input type="file" id="imageInput" accept="image/*" style="display: none;">
+</div>
+
+<div id="result" class="result" style="display: none;"></div>
+
+<script>
+    const uploadArea = document.querySelector('.upload-area');
+    const imageInput = document.getElementById('imageInput');
+    const resultDiv = document.getElementById('result');
+
+    let uploadedImageURL = null;
+
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            imageInput.files = files;
+            handleImageUpload(files[0]);
+        }
+    });
+
+    imageInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleImageUpload(e.target.files[0]);
+        }
+    });
+
+    async function handleImageUpload(file) {
+        const formData = new FormData();
+        formData.append('image', file);
+
+        uploadedImageURL = URL.createObjectURL(file);
+
+        try {
+            resultDiv.innerHTML = '<p>🔄 Analyzing image, please wait...</p>';
+            resultDiv.style.display = 'block';
+
+            const response = await fetch('/predict', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            displayResult(data);
+        } catch (error) {
+            resultDiv.innerHTML = `<p style="color:red;">❌ ${error.message}</p>`;
+        }
+    }
+
+    function displayResult(data) {
+        let careHtml = '';
+
+        if (data.care) {
+            careHtml = `
+                <div class="care-info">
+                    <h4>🩺 Care Recommendations</h4>
+
+                    <p><span class="care-title">Description:</span> ${data.care.description || 'N/A'}</p>
+
+                    ${data.care.symptoms ? `
+                    <p class="care-title">Symptoms:</p>
+                    <ul class="symptoms-list">
+                        ${data.care.symptoms.map(s => `<li>${s}</li>`).join('')}
+                    </ul>` : ''}
+
+                    ${data.care.causes ? `<p><span class="care-title">Causes:</span> ${data.care.causes}</p>` : ''}
+                    ${data.care.treatment ? `<p><span class="care-title">Treatment:</span> <b>${data.care.treatment}</b></p>` : ''}
+                    ${data.care.prevention ? `<p><span class="care-title">Prevention:</span> ${data.care.prevention}</p>` : ''}
+                    ${data.care.recommendation ? `<p><span class="care-title">Recommendation:</span> ${data.care.recommendation}</p>` : ''}
+                    ${data.care.severity ? `<p><span class="care-title">Severity:</span> ${data.care.severity}</p>` : ''}
+                </div>
+            `;
+        }
+
+        resultDiv.className = `result ${data.is_healthy ? 'healthy' : 'diseased'}`;
+        resultDiv.innerHTML = `
+            <h3>
+                📊 Prediction Result
+                <span class="badge ${data.is_healthy ? 'healthy' : 'diseased'}">
+                    ${data.is_healthy ? 'Healthy' : 'Diseased'}
+                </span>
+            </h3>
+
+            <p><b>Class:</b> ${data.class}</p>
+            <p><b>Confidence:</b> ${data.confidence.toFixed(1)}%</p>
+            <p><em>${data.message}</em></p>
+
+            <div class="image-grid">
+                <div class="image-card">
+                    <h4>🌿 Original Leaf Image</h4>
+                    <img src="${uploadedImageURL}" alt="Original Image">
+                </div>
+
+                ${data.gradcam_url ? `
+                <div class="image-card">
+                    <h4>🔥 GradCAM Heatmap</h4>
+                    <img src="${data.gradcam_url}" alt="GradCAM">
+                </div>` : ''}
+            </div>
+
+            ${careHtml}
+
+            <details>
+                <summary>🔧 Raw JSON Response (Debug)</summary>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+            </details>
+        `;
+    }
+</script>
+
+</body>
+</html>

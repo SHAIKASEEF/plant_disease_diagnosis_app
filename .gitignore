@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+*.pkl
+*.pt
+*.h5
+saved_epochs/
+gradcam_outputs/
+plantvillage_split/
+.DS_Store
+*.log
+.env
